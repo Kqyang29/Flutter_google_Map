@@ -1,7 +1,10 @@
 # googlemapapp
 
-A new Flutter project.
-
+ - get user current location
+ - search location
+ - show polyline
+ - search origin point and destination point
+ 
 ## Getting Started
 
 This project is a starting point for a Flutter application.
