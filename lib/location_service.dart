@@ -1,6 +1,7 @@
 import 'dart:convert' as convert;
 
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 class LocationService {
@@ -50,11 +51,43 @@ class LocationService {
       'start_location': json['routes'][0]['legs'][0]['start_location'],
       'end_location': json['routes'][0]['legs'][0]['end_location'],
       'polyline': json['routes'][0]['overview_polyline']['points'],
-      'polyline_decode':PolylinePoints().decodePolyline (json['routes'][0]['overview_polyline']['points']),
+      'polyline_decode': PolylinePoints()
+          .decodePolyline(json['routes'][0]['overview_polyline']['points']),
     };
     print(
       results,
     );
     return results;
+  }
+
+  Future<Position> getCurrentPosition() async {
+    // check user gps enable or not
+    bool serviceEnable;
+
+    LocationPermission permission;
+
+    serviceEnable = await Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnable) {
+      return Future.error("location service are disabled");
+    }
+
+    permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+
+      if (permission == LocationPermission.denied) {
+        return Future.error("location permission denied");
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error("location permission are permanently denied");
+    }
+
+    Position position = await Geolocator.getCurrentPosition();
+
+    return position;
   }
 }

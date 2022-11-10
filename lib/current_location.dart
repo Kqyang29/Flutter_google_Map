@@ -25,12 +25,6 @@ class _CurrentLocationPageState extends State<CurrentLocationPage> {
     zoom: 14.4746,
   );
 
-  static final CameraPosition _kLake = CameraPosition(
-      bearing: 192.8334901395799,
-      target: LatLng(37.43296265331129, -122.08832357078792),
-      tilt: 59.440717697143555,
-      zoom: 19.151926040649414);
-
   @override
   Widget build(BuildContext context) {
     return new Scaffold(
@@ -70,7 +64,8 @@ class _CurrentLocationPageState extends State<CurrentLocationPage> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  Position position = await _determinePosition();
+                  Position position =
+                      await LocationService().getCurrentPosition();
 
                   googleMapController.animateCamera(
                     CameraUpdate.newCameraPosition(
@@ -110,47 +105,7 @@ class _CurrentLocationPageState extends State<CurrentLocationPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _goToTheLake,
-        label: Text('To the lake!'),
-        icon: Icon(Icons.directions_boat),
-      ),
     );
-  }
-
-  Future<void> _goToTheLake() async {
-    googleMapController.animateCamera(CameraUpdate.newCameraPosition(_kLake));
-  }
-
-  Future<Position> _determinePosition() async {
-    // check user gps enable or not
-    bool serviceEnable;
-
-    LocationPermission permission;
-
-    serviceEnable = await Geolocator.isLocationServiceEnabled();
-
-    if (!serviceEnable) {
-      return Future.error("location service are disabled");
-    }
-
-    permission = await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-
-      if (permission == LocationPermission.denied) {
-        return Future.error("location permission denied");
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error("location permission are permanently denied");
-    }
-
-    Position position = await Geolocator.getCurrentPosition();
-
-    return position;
   }
 
   Future<void> _goToPlace(Map<String, dynamic> place) async {

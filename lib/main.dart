@@ -2,9 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:googlemapapp/current_location.dart';
+import 'package:googlemapapp/live_tracker.dart';
 import 'package:googlemapapp/location_service.dart';
+import 'package:googlemapapp/multi_user.dart';
+import 'package:googlemapapp/searchPlace.dart';
 
 void main() => runApp(MyApp());
 
@@ -13,10 +18,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Google Maps Demo',
-      home: CurrentLocationPage(),
+      home: MapSample(),
     );
   }
 }
+
+// get address name using geocode base on lat and log
 
 class MapSample extends StatefulWidget {
   @override
@@ -34,15 +41,14 @@ class MapSampleState extends State<MapSample> {
   Set<Polyline> _polylines = Set<Polyline>();
   Set<Polygon> _polygons = Set<Polygon>();
   List<LatLng> polygonLatLngs = <LatLng>[];
+  Placemark _address = Placemark();
 
   int _polygonIdCounter = 1;
   int _polylineIdCounter = 1;
 
   @override
-  void initState() {
-    // TODO: implement initState
+  void initState() async {
     super.initState();
-    _setMarker(LatLng(37.42796133580664, -122.085749655962));
   }
 
   void _setMarker(LatLng point) {
@@ -50,8 +56,16 @@ class MapSampleState extends State<MapSample> {
       () {
         _markers.add(
           Marker(
-            markerId: MarkerId("marker"),
+            markerId: MarkerId("marker ${_markers.length}"),
             position: point,
+            infoWindow: InfoWindow(
+              title: _address == null
+                  ? 'Position ${_markers.length + 1}'
+                  : '${_address.street}',
+              snippet: _address == null
+                  ? 'Latitude: ${point.latitude}, Longitude: ${point.longitude}'
+                  : '${_address.street},${_address.postalCode}, ${_address.administrativeArea},${_address.country},',
+            ),
           ),
         );
       },
@@ -90,67 +104,6 @@ class MapSampleState extends State<MapSample> {
     );
   }
 
-  static final CameraPosition _kGooglePlex = CameraPosition(
-    target: LatLng(37.42796133580664, -122.085749655962),
-    zoom: 14.4746,
-  );
-
-  // static final Marker _kGooglePlexMarker = Marker(
-  //   markerId: MarkerId('_kGooglePlex'),
-  //   // click Marker and check info of location
-  //   infoWindow: InfoWindow(title: 'Google Plex'),
-  //   // defaultMarker = red
-  //   icon: BitmapDescriptor.defaultMarker,
-  //   // select latitude and longitude
-  //   position: LatLng(37.42796133580664, -122.085749655962),
-  // );
-
-  // static final CameraPosition _kLake = CameraPosition(
-  //     bearing: 192.8334901395799,
-  //     target: LatLng(37.43296265331129, -122.08832357078792),
-  //     tilt: 59.440717697143555,
-  //     zoom: 19.151926040649414);
-
-  // static final Marker _kLakeMarker = Marker(
-  //   markerId: MarkerId('_kLake'),
-  //   // click Marker and check info of location
-  //   infoWindow: InfoWindow(title: '_kLake'),
-  //   // defaultMarker = red
-  //   icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-  //   // select latitude and longitude
-  //   position: LatLng(37.43296265331129, -122.08832357078792),
-  // );
-
-  // // connect Marker with polylines
-  // static final Polyline _kPolyline = Polyline(
-  //   polylineId: PolylineId("_kPoyline"),
-  //   // the line create with polyline widget
-  //   points: [
-  //     // _kGooglePlexMarker
-  //     LatLng(37.42796133580664, -122.085749655962),
-  //     // _kLakeMarker
-  //     LatLng(37.43296265331129, -122.08832357078792),
-  //   ],
-  //   // change line width
-  //   width: 5,
-  // );
-
-  // // polygons
-  // static final Polygon _kPolygon = Polygon(
-  //   polygonId: PolygonId("_kpolygon"),
-  //   points: [
-  //     // _kLakeMarker
-  //     LatLng(37.43296265331129, -122.08832357078792),
-  //     // _kGooglePlexMarker
-  //     LatLng(37.42796133580664, -122.085749655962),
-
-  //     LatLng(37.418, -122.092),
-  //     LatLng(37.435, -122.092),
-  //   ],
-  //   strokeWidth: 5,
-  //   fillColor: Colors.transparent,
-  // );
-
   @override
   Widget build(BuildContext context) {
     return new Scaffold(
@@ -171,7 +124,7 @@ class MapSampleState extends State<MapSample> {
                       controller: _originController,
                       textCapitalization: TextCapitalization.words,
                       decoration: InputDecoration(
-                        hintText: "Origin",
+                        hintText: "Your Current Location",
                       ),
                       onChanged: (value) {
                         print(value);
@@ -196,6 +149,17 @@ class MapSampleState extends State<MapSample> {
                     _originController.text,
                     _destinationController.text,
                   );
+
+                  // get distance
+                  double distance = Geolocator.distanceBetween(
+                    directions['start_location']['lat'],
+                    directions['start_location']['lng'],
+                    directions['end_location']['lat'],
+                    directions['end_location']['lng'],
+                  );
+                  // in meter
+                  print(distance);
+
                   _goToPlace(
                     directions['start_location']['lat'],
                     directions['start_location']['lng'],
@@ -246,37 +210,38 @@ class MapSampleState extends State<MapSample> {
               markers: _markers,
               polygons: _polygons,
               polylines: _polylines,
-              // add Markers then show in the Map
-              // markers: {
-              //   _kGooglePlexMarker,
-              //   // _kLakeMarker,
-              // },
-              // add polyline then can see the line between two Points
-              // polylines: {
-              //   _kPolyline,
-              // },
-              // polygons: {
-              //   _kPolygon,
-              // },
-              initialCameraPosition: _kGooglePlex,
+              initialCameraPosition: CameraPosition(
+                target: LatLng(43, 32),
+                zoom: 13.5,
+              ),
               onMapCreated: (GoogleMapController controller) {
                 _controller.complete(controller);
               },
-              onTap: (point) {
-                setState(() {
-                  polygonLatLngs.add(point);
-                  _setPolygon();
-                });
+              onTap: (point) async {
+                // display street name postal code
+                List<Placemark> placemarks = await placemarkFromCoordinates(
+                    point.latitude, point.longitude);
+                _address = placemarks[0];
+                _setMarker(point);
+                // print(placemarks[0].toString());
+                // setState(() {
+                //   polygonLatLngs.add(point);
+                //   _setPolygon();
+                // });
               },
             ),
           ),
         ],
       ),
-      // floatingActionButton: FloatingActionButton.extended(
-      //   onPressed: _goToTheLake,
-      //   label: Text('To the lake!'),
-      //   icon: Icon(Icons.directions_boat),
-      // ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          Position getCurrentPosition =
+              await LocationService().getCurrentPosition();
+          _goCurrentPostion(
+              getCurrentPosition.latitude, getCurrentPosition.longitude);
+        },
+        child: Icon(Icons.pin_drop),
+      ),
     );
   }
 
@@ -296,12 +261,29 @@ class MapSampleState extends State<MapSample> {
   //   _setMarker(LatLng(lat, lng));
   // }
 
+  //_goCurrentPostion
+  Future<void> _goCurrentPostion(
+    double clat,
+    double clng,
+  ) async {
+    final GoogleMapController controller = await _controller.future;
+    controller.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(clat, clng),
+          zoom: 12,
+        ),
+      ),
+    );
+    _setMarker(LatLng(clat, clng));
+  }
+
 //direction
   Future<void> _goToPlace(
-    double start_lat,
-    double start_lng,
-    double end_lat,
-    double end_lng,
+    double slat,
+    double slng,
+    double elat,
+    double elng,
     Map<String, dynamic> boundNe,
     Map<String, dynamic> boundSw,
   ) async {
@@ -309,7 +291,7 @@ class MapSampleState extends State<MapSample> {
     controller.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
-          target: LatLng(start_lat, start_lng),
+          target: LatLng(slat, slng),
           zoom: 12,
         ),
       ),
@@ -332,8 +314,8 @@ class MapSampleState extends State<MapSample> {
       ),
     );
 
-    _setMarker(LatLng(start_lat, start_lng));
-    _setMarker(LatLng(end_lat, end_lng));
+    _setMarker(LatLng(slat, slng));
+    _setMarker(LatLng(elat, elng));
   }
 
   // Future<void> _goToTheLake() async {
