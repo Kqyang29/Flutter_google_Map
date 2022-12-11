@@ -43,9 +43,12 @@ class LocationService {
     final String url =
         "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&key=$key";
     var response = await http.get(Uri.parse(url));
-    var json = convert.jsonDecode(response.body);
+    var json = await convert.jsonDecode(response.body);
+    // print(json['routes'][0]['bounds']);
 
     var results = {
+      'distance': json['routes'][0]['legs'][0]['distance'],
+      'duration': json['routes'][0]['legs'][0]['duration'],
       'bounds_ne': json['routes'][0]['bounds']['northeast'],
       'bounds_sw': json['routes'][0]['bounds']['southwest'],
       'start_location': json['routes'][0]['legs'][0]['start_location'],
@@ -57,6 +60,10 @@ class LocationService {
     print(
       results,
     );
+
+    if (results.isEmpty) {
+      print("error");
+    }
     return results;
   }
 

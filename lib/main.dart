@@ -42,13 +42,18 @@ class MapSampleState extends State<MapSample> {
   Set<Polygon> _polygons = Set<Polygon>();
   List<LatLng> polygonLatLngs = <LatLng>[];
   Placemark _address = Placemark();
+  late LatLng _currentPostion;
+  bool _isLoading = true;
+  String totalDistance = "null";
+  String totalDuration = "null";
 
   int _polygonIdCounter = 1;
   int _polylineIdCounter = 1;
 
   @override
-  void initState() async {
+  void initState() {
     super.initState();
+    getCurrentLocation();
   }
 
   void _setMarker(LatLng point) {
@@ -64,12 +69,26 @@ class MapSampleState extends State<MapSample> {
                   : '${_address.street}',
               snippet: _address == null
                   ? 'Latitude: ${point.latitude}, Longitude: ${point.longitude}'
-                  : '${_address.street},${_address.postalCode}, ${_address.administrativeArea},${_address.country},',
+                  : '${_address.street},${_address.postalCode},${_address.locality}, ${_address.administrativeArea},${_address.country},',
             ),
           ),
         );
+        // print(
+        //     '${_address.street},${_address.postalCode},${_address.locality}, ${_address.administrativeArea},${_address.country},');
       },
     );
+  }
+
+  getCurrentLocation() async {
+    Position position = await LocationService().getCurrentPosition();
+
+    LatLng location = LatLng(position.latitude, position.longitude);
+
+    setState(() {
+      _currentPostion = location;
+      _isLoading = false;
+      _setMarker(location);
+    });
   }
 
   void _setPolylines(List<PointLatLng> points) {
@@ -112,133 +131,201 @@ class MapSampleState extends State<MapSample> {
         centerTitle: true,
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          // direction
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(),
+            )
+          : Column(
+              children: [
+                // direction
+                Row(
                   children: [
-                    TextFormField(
-                      controller: _originController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        hintText: "Your Current Location",
+                    Expanded(
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _originController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(
+                              hintText: "Your Current Location",
+                            ),
+                            onChanged: (value) {
+                              print(value);
+                            },
+                          ),
+                          TextFormField(
+                            controller: _destinationController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(
+                              hintText: "Destination",
+                            ),
+                            onChanged: (value) {
+                              print(value);
+                            },
+                          ),
+                        ],
                       ),
-                      onChanged: (value) {
-                        print(value);
-                      },
                     ),
-                    TextFormField(
-                      controller: _destinationController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        hintText: "Destination",
-                      ),
-                      onChanged: (value) {
-                        print(value);
+                    IconButton(
+                      onPressed: () async {
+                        var directions = await LocationService().getDirection(
+                          _originController.text,
+                          _destinationController.text,
+                        );
+
+                        // // get distance
+                        // double distance = Geolocator.distanceBetween(
+                        //   directions['start_location']['lat'],
+                        //   directions['start_location']['lng'],
+                        //   directions['end_location']['lat'],
+                        //   directions['end_location']['lng'],
+                        // );
+                        // totalDistance = distance;
+                        // // in meter
+                        // print(distance);
+
+                        _goToPlace(
+                          directions['start_location']['lat'],
+                          directions['start_location']['lng'],
+                          directions['end_location']['lat'],
+                          directions['end_location']['lng'],
+                          directions["bounds_ne"],
+                          directions["bounds_sw"],
+                        );
+
+                        String distance =
+                            directions['distance']['text'].toString();
+                        totalDistance = distance;
+
+                        String duration =
+                            directions['duration']['text'].toString();
+                        totalDuration = duration;
+
+                        // print(directions['duration']['text']);
+                        // print(directions['distance']['text']);
+                        _setPolylines(
+                          directions['polyline_decode'],
+                        );
                       },
+                      icon: Icon(Icons.search),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                onPressed: () async {
-                  var directions = await LocationService().getDirection(
-                    _originController.text,
-                    _destinationController.text,
-                  );
-
-                  // get distance
-                  double distance = Geolocator.distanceBetween(
-                    directions['start_location']['lat'],
-                    directions['start_location']['lng'],
-                    directions['end_location']['lat'],
-                    directions['end_location']['lng'],
-                  );
-                  // in meter
-                  print(distance);
-
-                  _goToPlace(
-                    directions['start_location']['lat'],
-                    directions['start_location']['lng'],
-                    directions['end_location']['lat'],
-                    directions['end_location']['lng'],
-                    directions["bounds_ne"],
-                    directions["bounds_sw"],
-                  );
-
-                  _setPolylines(
-                    directions['polyline_decode'],
-                  );
-                },
-                icon: Icon(Icons.search),
-              ),
-            ],
-          ),
-          // search city
-          // Row(
-          //   children: [
-          //     Expanded(
-          //       child: TextFormField(
-          //         controller: _searchController,
-          //         textCapitalization: TextCapitalization.words,
-          //         decoration: InputDecoration(
-          //           hintText: "Search by City",
-          //         ),
-          //         onChanged: (value) {
-          //           print(value);
-          //         },
-          //       ),
-          //     ),
-          //     IconButton(
-          //       onPressed: () async {
-          //         var place = await LocationService().getPlace(
-          //           _searchController.text,
-          //         );
-          //         _goToPlace(place);
-          //       },
-          //       icon: Icon(Icons.search),
-          //     ),
-          //   ],
-          // ),
-          Expanded(
-            child: GoogleMap(
-              // Type of Map: normal = terrain, satellite
-              mapType: MapType.normal,
-              markers: _markers,
-              polygons: _polygons,
-              polylines: _polylines,
-              initialCameraPosition: CameraPosition(
-                target: LatLng(43, 32),
-                zoom: 13.5,
-              ),
-              onMapCreated: (GoogleMapController controller) {
-                _controller.complete(controller);
-              },
-              onTap: (point) async {
-                // display street name postal code
-                List<Placemark> placemarks = await placemarkFromCoordinates(
-                    point.latitude, point.longitude);
-                _address = placemarks[0];
-                _setMarker(point);
-                // print(placemarks[0].toString());
-                // setState(() {
-                //   polygonLatLngs.add(point);
-                //   _setPolygon();
-                // });
-              },
+                // search city
+                // Row(
+                //   children: [
+                //     Expanded(
+                //       child: TextFormField(
+                //         controller: _searchController,
+                //         textCapitalization: TextCapitalization.words,
+                //         decoration: InputDecoration(
+                //           hintText: "Search by City",
+                //         ),
+                //         onChanged: (value) {
+                //           print(value);
+                //         },
+                //       ),
+                //     ),
+                //     IconButton(
+                //       onPressed: () async {
+                //         var place = await LocationService().getPlace(
+                //           _searchController.text,
+                //         );
+                //         _goToPlace(place);
+                //       },
+                //       icon: Icon(Icons.search),
+                //     ),
+                //   ],
+                // ),
+                Expanded(
+                  child: GoogleMap(
+                    // Type of Map: normal = terrain, satellite
+                    mapType: MapType.normal,
+                    markers: _markers,
+                    polygons: _polygons,
+                    polylines: _polylines,
+                    initialCameraPosition: CameraPosition(
+                      target: _currentPostion,
+                      zoom: 13.5,
+                    ),
+                    onMapCreated: (GoogleMapController controller) {
+                      _controller.complete(controller);
+                    },
+                    onTap: (point) async {
+                      // display street name postal code
+                      List<Placemark> placemarks =
+                          await placemarkFromCoordinates(
+                              point.latitude, point.longitude);
+                      _address = placemarks[0];
+                      _setMarker(point);
+                      // print(placemarks[0].toString());
+                      // setState(() {
+                      //   polygonLatLngs.add(point);
+                      //   _setPolygon();
+                      // });
+                    },
+                  ),
+                ),
+                Positioned(
+                  bottom: 200,
+                  left: 50,
+                  child: Container(
+                    child: Card(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              "Total Distance: " + totalDistance + " Mile",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              "Total Duration: " + totalDuration + " Min",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           Position getCurrentPosition =
               await LocationService().getCurrentPosition();
-          _goCurrentPostion(
-              getCurrentPosition.latitude, getCurrentPosition.longitude);
+          // _goCurrentPostion(
+          //     getCurrentPosition.latitude, getCurrentPosition.longitude);
+
+          LatLng location =
+              LatLng(getCurrentPosition.latitude, getCurrentPosition.longitude);
+
+          // display street name postal code
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+              location.latitude, location.longitude);
+
+          _address = placemarks[0];
+
+          setState(() {
+            _currentPostion = location;
+            _isLoading = false;
+            _originController.text = '${_address.street}';
+            _setMarker(location);
+          });
+
+          //  setState(() {
+          //    _originController.text==
+          //  });
         },
         child: Icon(Icons.pin_drop),
       ),
@@ -313,6 +400,8 @@ class MapSampleState extends State<MapSample> {
         25,
       ),
     );
+
+    _markers.clear();
 
     _setMarker(LatLng(slat, slng));
     _setMarker(LatLng(elat, elng));
