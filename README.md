@@ -4,6 +4,8 @@
  - search location
  - show polyline
  - search origin point and destination point
+ - check origin and destination api 
+   - https://maps.googleapis.com/maps/api/directions/json?origin=China&destination=Myanmar&key=AIzaSyAX0FkkQbK_i7fHeqXvO1kcn34PZrlL0Zo
  
 ## Getting Started
 
